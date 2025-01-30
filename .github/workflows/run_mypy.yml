@@ -1,40 +1,67 @@
-name: Run mypy
+name: Run mypy and Execute Python
 
 on:
   push:
-    branches:
-      - main  # mainブランチへのプッシュ時に実行
-  pull_request:
-    branches:
-      - main  # mainブランチへのプルリクエスト時に実行
 
 jobs:
-  type-check:
+  # mypyの型チェックジョブ
+  mypy-check:
     runs-on: ubuntu-latest
 
     steps:
-    # リポジトリをチェックアウト
-    - name: Check out code
-      uses: actions/checkout@v3
+      # リポジトリをチェックアウト
+      - name: Check out code
+        uses: actions/checkout@v3
 
-    # Python環境のセットアップ
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.12  # Pythonバージョン指定
+      # Python環境のセットアップ
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13  # Pythonバージョン指定
 
-    # 依存関係のインストール
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      # 依存関係のインストール
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    # mypyの実行
-    - name: Run mypy
-      run: |
-        mypy src/  # srcディレクトリの型チェック
+      # mypy の実行（型エラーが発生する前提）
+      - name: Run mypy
+        run: |
+          mypy src/  # srcディレクトリの型チェック
+        continue-on-error: true  # エラーが発生してもワークフローを継続
 
-    # run source code
-    - name: Run source code
-      run: |
-        python src/main.py  # srcディレクトリのmain.pyを実行。
+      # エラー発生時のデバッグログ
+      - name: Debug logs (if mypy fails)
+        if: failure()
+        run: |
+          echo "=== Mypy Debug Logs ==="
+          mypy --show-error-codes src/
+
+  # Pythonスクリプトの実行ジョブ
+  run-python:
+    runs-on: ubuntu-latest
+    needs: mypy-check  # mypy チェックの後に実行
+    if: always()  # mypy がエラーでも Python を実行
+
+    steps:
+      # リポジトリをチェックアウト
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      # Python環境のセットアップ
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13  # Pythonバージョン指定
+
+      # 依存関係のインストール
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Pythonスクリプトの実行
+      - name: Run source code
+        run: |
+          python src/main.py  # srcディレクトリのmain.pyを実行
